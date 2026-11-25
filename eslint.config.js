@@ -29,4 +29,10 @@ export default tseslint.config(
       'no-eval': 'error',
     },
   },
+  {
+    // Playwright 測試：fixture 的 use() 不是 React hook
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+    rules: { 'react-hooks/rules-of-hooks': 'off' },
+  },
 );

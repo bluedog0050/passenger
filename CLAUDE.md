@@ -27,7 +27,8 @@
 - `npm run typecheck`：型別檢查
 - `npm run lint`：程式碼檢查
 - `npm run test`：單元測試
-- 每個階段結束前，typecheck、lint、test、build 都必須通過
+- `npm run e2e`：端對端測試（Playwright，外部服務皆為模擬資料；部署前自動執行）
+- 每個階段結束前，typecheck、lint、test、e2e、build 都必須通過
 
 ## 工作規則
 
