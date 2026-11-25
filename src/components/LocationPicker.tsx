@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import { DEFAULT_CENTER } from '../lib/geo';
 import { MAX_BOUNDS, TILE_ATTRIBUTION, TILE_URL } from '../lib/mapConfig';
@@ -10,6 +10,8 @@ export interface LatLng {
 }
 
 interface Props {
+  /** 要求地圖移到某個位置（例如地址搜尋結果）；seq 變動時才移動 */
+  focus?: { lat: number; lng: number; seq: number } | null;
   /** 地圖中心改變時回報；byUser 表示是使用者拖曳造成的 */
   onChange: (pos: LatLng, byUser: boolean) => void;
   invalid?: boolean;
@@ -18,9 +20,14 @@ interface Props {
 
 const PICK_ZOOM = 17;
 
-function Controller({ onChange }: Pick<Props, 'onChange'>) {
+function Controller({ onChange, focus }: Pick<Props, 'onChange' | 'focus'>) {
   const map = useMap();
   const userMoved = useRef(false);
+
+  useEffect(() => {
+    if (focus) map.setView([focus.lat, focus.lng], 18, { animate: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.seq, map]);
 
   useMapEvents({
     dragstart: () => {
@@ -36,7 +43,7 @@ function Controller({ onChange }: Pick<Props, 'onChange'>) {
 }
 
 /** 選擇地點：預設在國立中興大學，中央固定一根大頭針，拖曳地圖來對準位置（不使用 GPS 定位） */
-export default function LocationPicker({ onChange, invalid, describedBy }: Props) {
+export default function LocationPicker({ onChange, focus, invalid, describedBy }: Props) {
   return (
     <div
       className={`relative h-60 overflow-hidden rounded-2xl border-2 ${invalid ? 'border-red-600' : 'border-transparent'}`}
@@ -57,7 +64,7 @@ export default function LocationPicker({ onChange, invalid, describedBy }: Props
       >
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} maxZoom={19} />
         <ChinaMask />
-        <Controller onChange={onChange} />
+        <Controller onChange={onChange} focus={focus} />
       </MapContainer>
 
       {/* 固定在中央的大頭針，針尖對準地圖中心 */}

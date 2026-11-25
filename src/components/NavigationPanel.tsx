@@ -1,4 +1,6 @@
 import { getCategory } from '../data/categories';
+import type { GeocodeResult } from '../lib/geocode';
+import AddressSearch from './AddressSearch';
 import { DEFAULT_PLACE_NAME } from '../lib/geo';
 import { formatDistance, walkingMinutes, type AlongRouteItem } from '../lib/routeGeometry';
 import type { NavState } from '../lib/useNavigation';
@@ -10,6 +12,8 @@ interface Props {
   onSetDefaultStart: () => void;
   /** 以畫面中央圖釘的位置確定起點或終點 */
   onConfirm: () => void;
+  /** 選了地址搜尋結果：把地圖移過去，讓中央圖釘對準 */
+  onAddressSelect: (r: GeocodeResult) => void;
   onRestart: () => void;
   onExit: () => void;
   onSelectProblem: (id: string) => void;
@@ -40,6 +44,7 @@ export default function NavigationPanel({
   problems,
   onSetDefaultStart,
   onConfirm,
+  onAddressSelect,
   onRestart,
   onExit,
   onSelectProblem,
@@ -49,7 +54,10 @@ export default function NavigationPanel({
   return (
     <section
       aria-label="導航"
-      className="absolute inset-x-0 bottom-0 z-[1020] max-h-[50%] animate-slide-up overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-4 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
+      className={`absolute inset-x-0 bottom-0 z-[1020] ${
+        // 選點時面板不超過畫面 45%，讓畫面中央的圖釘一定看得到
+        phase === 'pickStart' || phase === 'pickEnd' ? 'max-h-[45%]' : 'max-h-[50%]'
+      } animate-slide-up overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-4 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]`}
     >
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-bold">導航</h2>
@@ -70,7 +78,8 @@ export default function NavigationPanel({
 
       {phase === 'pickStart' && (
         <div className="space-y-3">
-          <Step n="起" text="拖曳地圖，把綠色圖釘對準起點" />
+          <Step n="起" text="輸入地址，或拖曳地圖把綠色圖釘對準起點" />
+          <AddressSearch key="start" onSelect={onAddressSelect} placeholder="輸入起點地址或地標" />
           <button type="button" onClick={onConfirm} className={primaryBtn}>
             確定起點
           </button>
@@ -83,7 +92,8 @@ export default function NavigationPanel({
       {phase === 'pickEnd' && (
         <div className="space-y-3">
           <Step n="起" text="已選擇起點" done />
-          <Step n="終" text="拖曳地圖，把紅色圖釘對準終點" />
+          <Step n="終" text="輸入地址，或拖曳地圖把紅色圖釘對準終點" />
+          <AddressSearch key="end" onSelect={onAddressSelect} placeholder="輸入終點地址或地標" />
           <button type="button" onClick={onConfirm} className={primaryBtn}>
             確定終點
           </button>

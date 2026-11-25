@@ -124,6 +124,10 @@ export default function MapPage() {
 
   // 導航：以畫面中央圖釘（地圖中心）的位置確定起點或終點
   const mapRef = useRef<L.Map>(null);
+  const moveToAddress = (r: { lat: number; lng: number }) => {
+    mapRef.current?.setView([r.lat, r.lng], 17);
+    setToast('已移到搜尋結果，確認圖釘位置後按「確定」');
+  };
   const confirmCenter = () => {
     const c = mapRef.current?.getCenter();
     if (c) nav.confirmPoint([c.lat, c.lng]);
@@ -332,6 +336,7 @@ export default function MapPage() {
           problems={problems}
           onSetDefaultStart={nav.setDefaultStart}
           onConfirm={confirmCenter}
+          onAddressSelect={moveToAddress}
           onRestart={nav.restart}
           onExit={nav.exit}
           onSelectProblem={setSelectedId}

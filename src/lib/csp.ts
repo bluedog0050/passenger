@@ -5,6 +5,8 @@
 export const TILE_HOST = 'https://tile.openstreetmap.org';
 /** OSRM 公益步行路線服務（不需金鑰、不需註冊） */
 export const ROUTING_HOST = 'https://routing.openstreetmap.de';
+/** Nominatim 地址查詢服務（OpenStreetMap 官方，不需金鑰；每秒最多 1 次、不可自動完成） */
+export const GEOCODE_HOST = 'https://nominatim.openstreetmap.org';
 
 export function buildCsp(): string {
   return [
@@ -13,7 +15,7 @@ export function buildCsp(): string {
     // Leaflet 會用 inline style 定位地圖圖塊
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${TILE_HOST}`,
-    `connect-src 'self' ${ROUTING_HOST}`,
+    `connect-src 'self' ${ROUTING_HOST} ${GEOCODE_HOST}`,
     "font-src 'self'",
     "manifest-src 'self'",
     "worker-src 'self'",

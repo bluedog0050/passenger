@@ -7,6 +7,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react';
+import AddressSearch from '../components/AddressSearch';
 import LocationPicker, { type LatLng } from '../components/LocationPicker';
 import { CATEGORIES } from '../data/categories';
 import { setCreatedFlash } from '../lib/flash';
@@ -77,6 +78,7 @@ export default function ReportPage() {
     lng: DEFAULT_CENTER[1],
   });
   const [locationByUser, setLocationByUser] = useState(false);
+  const [focus, setFocus] = useState<{ lat: number; lng: number; seq: number } | null>(null);
   const [reportedAt, setReportedAt] = useState(initialTime);
   const [category, setCategory] = useState<CategoryId | null>(null);
   const [description, setDescription] = useState('');
@@ -212,7 +214,7 @@ export default function ReportPage() {
   if (location && !isInTaiwan(location.lat, location.lng))
     locationHint = '大頭針不在台灣範圍內，請移動地圖';
   else if (locationByUser) locationHint = '已選擇地點，可以繼續拖曳地圖微調';
-  else locationHint = `目前在${DEFAULT_PLACE_NAME}，請拖曳地圖讓大頭針對準問題地點`;
+  else locationHint = `目前在${DEFAULT_PLACE_NAME}，可搜尋地址，或拖曳地圖讓大頭針對準問題地點`;
 
   const ariaFor = (name: FieldName) => ({
     'aria-invalid': errors[name] ? true : undefined,
@@ -313,11 +315,21 @@ export default function ReportPage() {
               選擇地點<span className="font-normal text-red-700">*</span>
             </SectionTitle>
             <div id={fieldId('location')} tabIndex={-1}>
-              <LocationPicker
-                onChange={onLocationChange}
-                invalid={Boolean(errors.location)}
-                describedBy={errors.location ? errorId('location') : undefined}
+              <AddressSearch
+                onSelect={(r) => {
+                  setFocus((f) => ({ lat: r.lat, lng: r.lng, seq: (f?.seq ?? 0) + 1 }));
+                  setLocation({ lat: r.lat, lng: r.lng });
+                  setLocationByUser(true);
+                }}
               />
+              <div className="mt-3">
+                <LocationPicker
+                  focus={focus}
+                  onChange={onLocationChange}
+                  invalid={Boolean(errors.location)}
+                  describedBy={errors.location ? errorId('location') : undefined}
+                />
+              </div>
             </div>
             <p className="mt-2 text-sm text-gray-600" aria-live="polite">
               {locationHint}
