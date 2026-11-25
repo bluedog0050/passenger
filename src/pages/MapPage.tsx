@@ -7,13 +7,7 @@ import ReportSheet from '../components/ReportSheet';
 import Toast from '../components/Toast';
 import { getMarkerIcon } from '../components/markerIcon';
 import { DEFAULT_CENTER, DEFAULT_PLACE_NAME, DEFAULT_ZOOM } from '../lib/geo';
-import {
-  MAX_BOUNDS,
-  TILE_ATTRIBUTION,
-  TILE_MAX_ZOOM,
-  TILE_SUBDOMAINS,
-  TILE_URL,
-} from '../lib/mapConfig';
+import { MAX_BOUNDS, TILE_ATTRIBUTION, TILE_URL } from '../lib/mapConfig';
 import { clearCreatedFlash, peekCreatedFlash } from '../lib/flash';
 import { navigate } from '../lib/router';
 import { useReports } from '../lib/useReports';
@@ -116,9 +110,8 @@ export default function MapPage() {
         <TileLayer
           ref={tileRef}
           url={TILE_URL}
-          subdomains={TILE_SUBDOMAINS}
           attribution={TILE_ATTRIBUTION}
-          maxZoom={TILE_MAX_ZOOM}
+          maxZoom={19}
           eventHandlers={{
             tileerror: () => setTileError(true),
             tileload: () => setTileError(false),

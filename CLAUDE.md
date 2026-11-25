@@ -6,7 +6,7 @@
 
 - 純前端 PWA 示意版（MVP），部署在 GitHub Pages：`https://bluedog0050.github.io/passenger/`
 - 沒有後端、沒有資料庫伺服器、沒有登入；資料存在瀏覽器 IndexedDB
-- 地圖使用 Leaflet + CARTO Voyager 底圖（OpenStreetMap 資料），範圍是全台灣，中國大陸以灰色遮罩
+- 地圖使用 Leaflet + OpenStreetMap，範圍是全台灣
 - 介面一律使用繁體中文；手機優先
 
 ## 技術選擇
@@ -57,8 +57,8 @@
 - 上傳的照片**一律**經過 canvas 重新輸出成 JPEG，並用 `stripJpegMetadata()` 刪除附加資訊區段，確認不含 EXIF/GPS；長邊 ≤ 1280px；最多 3 張；原始檔 ≤ 10MB；只接受 JPG/PNG/HEIC
 - 禁止 `dangerouslySetInnerHTML`、`eval`、`innerHTML` 寫入使用者內容
 - 不收集姓名、電話、email 或其他個人資料
-- 不從外部 CDN 載入程式；只允許向 CARTO 圖磚網域（`{a,b,c,d}.basemaps.cartocdn.com`）請求圖片；更換底圖時要同步修改 `src/lib/mapConfig.ts` 與 `vite.config.ts` 的 CSP，並取得使用者同意
-- 保留來源標示「© OpenStreetMap contributors © CARTO」
+- 不從外部 CDN 載入程式；只允許向 OSM 圖磚網域請求圖片
+- 保留 OSM 來源標示「© OpenStreetMap contributors」
 - 不在程式碼中放任何金鑰；`.env*` 列入 `.gitignore`（`.env.example` 除外）
 - 不新增會把使用者資料送到第三方的服務（分析、追蹤、廣告），除非使用者明確同意
 - 輸入驗證：類別必須是 6 種之一；說明 ≤ 200 字；座標必須在台灣範圍內（緯度 21.5–26.6、經度 117.8–122.4，且不在中國大陸陸地上，使用 `isInTaiwan()`）；時間不能是未來，也不能早於 30 天前
