@@ -1,7 +1,13 @@
 import { useRef } from 'react';
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import { DEFAULT_CENTER } from '../lib/geo';
-import { MAX_BOUNDS, TILE_ATTRIBUTION, TILE_URL } from '../lib/mapConfig';
+import {
+  MAX_BOUNDS,
+  TILE_ATTRIBUTION,
+  TILE_MAX_ZOOM,
+  TILE_SUBDOMAINS,
+  TILE_URL,
+} from '../lib/mapConfig';
 import ChinaMask from './ChinaMask';
 
 export interface LatLng {
@@ -55,7 +61,12 @@ export default function LocationPicker({ onChange, invalid, describedBy }: Props
         doubleClickZoom="center"
         className="h-full w-full"
       >
-        <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} maxZoom={19} />
+        <TileLayer
+          url={TILE_URL}
+          subdomains={TILE_SUBDOMAINS}
+          attribution={TILE_ATTRIBUTION}
+          maxZoom={TILE_MAX_ZOOM}
+        />
         <ChinaMask />
         <Controller onChange={onChange} />
       </MapContainer>
