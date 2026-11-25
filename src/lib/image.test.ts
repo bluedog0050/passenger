@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitWithin, hasExifSegment } from './image';
+import { fitWithin, hasExifSegment, stripJpegMetadata } from './image';
 
 describe('fitWithin', () => {
   it('大照片等比例縮小到長邊 1280', () => {
@@ -29,5 +29,29 @@ describe('hasExifSegment', () => {
   });
   it('不是 JPEG', () => {
     expect(hasExifSegment(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toBe(false);
+  });
+});
+
+describe('stripJpegMetadata', () => {
+  it('移除 EXIF，保留 JFIF 與影像資料', () => {
+    const out = stripJpegMetadata(jpeg(true));
+    expect(out).not.toBeNull();
+    expect(hasExifSegment(out!)).toBe(false);
+    expect(Array.from(out!)).toEqual(Array.from(jpeg(false)));
+  });
+  it('移除註解（COM）區段', () => {
+    const withComment = new Uint8Array([
+      0xff, 0xd8, 0xff, 0xfe, 0x00, 0x04, 0x68, 0x69, 0xff, 0xda, 0x00, 0x02, 0xff, 0xd9,
+    ]);
+    expect(Array.from(stripJpegMetadata(withComment)!)).toEqual([
+      0xff, 0xd8, 0xff, 0xda, 0x00, 0x02, 0xff, 0xd9,
+    ]);
+  });
+  it('沒有 EXIF 的檔案不變', () => {
+    expect(Array.from(stripJpegMetadata(jpeg(false))!)).toEqual(Array.from(jpeg(false)));
+  });
+  it('不是 JPEG 或長度錯誤回傳 null', () => {
+    expect(stripJpegMetadata(new Uint8Array([0x89, 0x50]))).toBeNull();
+    expect(stripJpegMetadata(new Uint8Array([0xff, 0xd8, 0xff, 0xe1, 0xff, 0xff]))).toBeNull();
   });
 });

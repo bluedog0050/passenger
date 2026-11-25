@@ -1,7 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
-import { TAIWAN_CENTER, TAIWAN_ZOOM } from '../lib/geo';
-import type { GeoState } from '../lib/geolocation';
+import { DEFAULT_CENTER } from '../lib/geo';
 import { MAX_BOUNDS, TILE_ATTRIBUTION, TILE_URL } from '../lib/mapConfig';
 import ChinaMask from './ChinaMask';
 
@@ -11,7 +10,6 @@ export interface LatLng {
 }
 
 interface Props {
-  geo: GeoState;
   /** 地圖中心改變時回報；byUser 表示是使用者拖曳造成的 */
   onChange: (pos: LatLng, byUser: boolean) => void;
   invalid?: boolean;
@@ -20,26 +18,16 @@ interface Props {
 
 const PICK_ZOOM = 17;
 
-function Controller({ geo, onChange }: Pick<Props, 'geo' | 'onChange'>) {
+function Controller({ onChange }: Pick<Props, 'onChange'>) {
   const map = useMap();
   const userMoved = useRef(false);
-  const fixId = geo.status === 'found' ? geo.fixId : 0;
-
-  // 定位成功：移到使用者位置（使用者已經自己拖過地圖就不搶走）
-  useEffect(() => {
-    if (geo.status !== 'found' || userMoved.current) return;
-    map.setView([geo.lat, geo.lng], PICK_ZOOM, { animate: false });
-    onChange({ lat: geo.lat, lng: geo.lng }, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fixId, map]);
 
   useMapEvents({
     dragstart: () => {
       userMoved.current = true;
     },
+    // 拖曳或縮放結束時，地圖中心就是回報地點
     moveend: () => {
-      // 只有定位成功或使用者拖曳過，才把地圖中心當成回報地點
-      if (!userMoved.current && geo.status !== 'found') return;
       const c = map.getCenter();
       onChange({ lat: c.lat, lng: c.lng }, userMoved.current);
     },
@@ -47,16 +35,16 @@ function Controller({ geo, onChange }: Pick<Props, 'geo' | 'onChange'>) {
   return null;
 }
 
-/** 選擇地點：中央固定一根大頭針，拖曳地圖來對準位置 */
-export default function LocationPicker({ geo, onChange, invalid, describedBy }: Props) {
+/** 選擇地點：預設在國立中興大學，中央固定一根大頭針，拖曳地圖來對準位置（不使用 GPS 定位） */
+export default function LocationPicker({ onChange, invalid, describedBy }: Props) {
   return (
     <div
       className={`relative h-60 overflow-hidden rounded-2xl border-2 ${invalid ? 'border-red-600' : 'border-transparent'}`}
       aria-describedby={describedBy}
     >
       <MapContainer
-        center={TAIWAN_CENTER}
-        zoom={TAIWAN_ZOOM}
+        center={DEFAULT_CENTER}
+        zoom={PICK_ZOOM}
         minZoom={7}
         maxZoom={19}
         maxBounds={MAX_BOUNDS}
@@ -69,7 +57,7 @@ export default function LocationPicker({ geo, onChange, invalid, describedBy }: 
       >
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} maxZoom={19} />
         <ChinaMask />
-        <Controller geo={geo} onChange={onChange} />
+        <Controller onChange={onChange} />
       </MapContainer>
 
       {/* 固定在中央的大頭針，針尖對準地圖中心 */}

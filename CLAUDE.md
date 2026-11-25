@@ -43,7 +43,7 @@
   - `src/pages/`：頁面（MapPage、ReportPage）
   - `src/components/`：共用元件
   - `src/lib/`：邏輯（storage、geo、image、validation）
-  - `src/data/`：範例資料、類別定義
+  - `src/data/`：類別定義、中國大陸遮罩資料
   - `src/types.ts`：共用型別
 - 禁止使用 `any`；外部資料要先驗證再使用
 - 類別代碼、顏色、名稱只定義在 `src/data/categories.ts` 這一個地方
@@ -54,7 +54,7 @@
 
 ## 安全與隱私規則（不可為了趕進度而跳過）
 
-- 上傳的照片**一律**經過 canvas 重新輸出成 JPEG，移除 EXIF/GPS；長邊 ≤ 1280px；最多 3 張；原始檔 ≤ 10MB；只接受 JPG/PNG/HEIC
+- 上傳的照片**一律**經過 canvas 重新輸出成 JPEG，並用 `stripJpegMetadata()` 刪除附加資訊區段，確認不含 EXIF/GPS；長邊 ≤ 1280px；最多 3 張；原始檔 ≤ 10MB；只接受 JPG/PNG/HEIC
 - 禁止 `dangerouslySetInnerHTML`、`eval`、`innerHTML` 寫入使用者內容
 - 不收集姓名、電話、email 或其他個人資料
 - 不從外部 CDN 載入程式；只允許向 OSM 圖磚網域請求圖片

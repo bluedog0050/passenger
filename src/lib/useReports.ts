@@ -1,14 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getSampleReports } from '../data/samples';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReportView } from '../types';
 import { deleteReport, getReportPhotos, listReports } from './storage';
 
 export type LoadStatus = 'loading' | 'ready' | 'error';
 
-/** 地圖上的所有回報 = 範例資料 + 使用者存在這台裝置上的回報 */
+/** 地圖上的回報 = 使用者存在這台裝置上的回報 */
 export function useReports() {
-  const samples = useMemo(() => getSampleReports(), []);
-  const [own, setOwn] = useState<ReportView[]>([]);
+  const [reports, setReports] = useState<ReportView[]>([]);
   const [status, setStatus] = useState<LoadStatus>('loading');
   const urls = useRef<string[]>([]);
 
@@ -19,20 +17,19 @@ export function useReports() {
 
   const load = useCallback(async () => {
     try {
-      const reports = await listReports();
+      const stored = await listReports();
       const views = await Promise.all(
-        reports.map(async (r): Promise<ReportView> => {
+        stored.map(async (r): Promise<ReportView> => {
           const photos = await getReportPhotos(r.id);
           return {
             ...r,
             photoUrls: photos.map((p) => URL.createObjectURL(p.data)),
-            isSample: false,
           };
         }),
       );
       revokeAll();
       urls.current = views.flatMap((v) => v.photoUrls);
-      setOwn(views);
+      setReports(views);
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -52,6 +49,5 @@ export function useReports() {
     [load],
   );
 
-  const reports = useMemo(() => [...samples, ...own], [samples, own]);
   return { reports, status, remove };
 }

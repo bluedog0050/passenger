@@ -23,8 +23,7 @@ export interface Report {
   schemaVersion: 1;
 }
 
-/** 地圖上顯示用的回報：加上照片網址與是否為範例 */
+/** 地圖上顯示用的回報：加上照片網址 */
 export interface ReportView extends Report {
   photoUrls: string[];
-  isSample: boolean;
 }

@@ -10,8 +10,7 @@ import {
 import LocationPicker, { type LatLng } from '../components/LocationPicker';
 import { CATEGORIES } from '../data/categories';
 import { setCreatedFlash } from '../lib/flash';
-import { isInTaiwan } from '../lib/geo';
-import { useGeolocation } from '../lib/geolocation';
+import { DEFAULT_CENTER, DEFAULT_PLACE_NAME, isInTaiwan } from '../lib/geo';
 import { processPhoto, type ProcessedPhoto } from '../lib/image';
 import { navigate } from '../lib/router';
 import { createReport } from '../lib/storage';
@@ -67,13 +66,16 @@ function SectionTitle({ step, children }: { step: number; children: ReactNode })
 }
 
 export default function ReportPage() {
-  const { state: geo, locate } = useGeolocation();
   const [initialTime] = useState(() => toLocalInputValue(new Date()));
 
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [processing, setProcessing] = useState(0);
   const [photoNotice, setPhotoNotice] = useState<string | null>(null);
-  const [location, setLocation] = useState<LatLng | null>(null);
+  // 預設地點為國立中興大學，使用者拖曳地圖來調整
+  const [location, setLocation] = useState<LatLng | null>({
+    lat: DEFAULT_CENTER[0],
+    lng: DEFAULT_CENTER[1],
+  });
   const [locationByUser, setLocationByUser] = useState(false);
   const [reportedAt, setReportedAt] = useState(initialTime);
   const [category, setCategory] = useState<CategoryId | null>(null);
@@ -207,12 +209,10 @@ export default function ReportPage() {
   const descLength = description.trim().length;
 
   let locationHint: string;
-  if (geo.status === 'locating' && !locationByUser) locationHint = '正在取得你的位置…';
-  else if (location && !isInTaiwan(location.lat, location.lng))
+  if (location && !isInTaiwan(location.lat, location.lng))
     locationHint = '大頭針不在台灣範圍內，請移動地圖';
   else if (locationByUser) locationHint = '已選擇地點，可以繼續拖曳地圖微調';
-  else if (geo.status === 'found') locationHint = '已使用你目前的位置，可拖曳地圖微調';
-  else locationHint = '無法取得你的位置，請拖曳地圖，把大頭針對準問題地點';
+  else locationHint = `目前在${DEFAULT_PLACE_NAME}，請拖曳地圖讓大頭針對準問題地點`;
 
   const ariaFor = (name: FieldName) => ({
     'aria-invalid': errors[name] ? true : undefined,
@@ -314,25 +314,14 @@ export default function ReportPage() {
             </SectionTitle>
             <div id={fieldId('location')} tabIndex={-1}>
               <LocationPicker
-                geo={geo}
                 onChange={onLocationChange}
                 invalid={Boolean(errors.location)}
                 describedBy={errors.location ? errorId('location') : undefined}
               />
             </div>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <p className="text-sm text-gray-600" aria-live="polite">
-                {locationHint}
-              </p>
-              <button
-                type="button"
-                onClick={locate}
-                disabled={geo.status === 'locating'}
-                className="h-11 flex-none rounded-full px-3 text-sm font-medium text-blue-700 active:bg-blue-50 disabled:opacity-50"
-              >
-                重新定位
-              </button>
-            </div>
+            <p className="mt-2 text-sm text-gray-600" aria-live="polite">
+              {locationHint}
+            </p>
             <FieldError name="location" errors={errors} />
           </section>
 

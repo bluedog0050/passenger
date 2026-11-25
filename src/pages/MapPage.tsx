@@ -1,51 +1,30 @@
 import L from 'leaflet';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Circle,
-  CircleMarker,
-  MapContainer,
-  Marker,
-  TileLayer,
-  useMap,
-  useMapEvents,
-} from 'react-leaflet';
+import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import ChinaMask from '../components/ChinaMask';
 import Legend from '../components/Legend';
 import ReportSheet from '../components/ReportSheet';
 import Toast from '../components/Toast';
 import { getMarkerIcon } from '../components/markerIcon';
-import { TAIWAN_CENTER, TAIWAN_ZOOM } from '../lib/geo';
+import { DEFAULT_CENTER, DEFAULT_PLACE_NAME, DEFAULT_ZOOM } from '../lib/geo';
 import { MAX_BOUNDS, TILE_ATTRIBUTION, TILE_URL } from '../lib/mapConfig';
-import { GEO_MESSAGES, useGeolocation, type GeoState } from '../lib/geolocation';
 import { clearCreatedFlash, peekCreatedFlash } from '../lib/flash';
 import { navigate } from '../lib/router';
 import { useReports } from '../lib/useReports';
 import type { ReportView } from '../types';
 
-const USER_ZOOM = 16;
-
-/** 定位成功時把地圖移過去；點地圖空白處關閉卡片 */
+/** 點地圖空白處關閉卡片；收到「回到預設地點」請求時移動地圖 */
 function MapController({
-  geo,
   onMapClick,
-  skipFirstFix,
+  homeRequest,
 }: {
-  geo: GeoState;
   onMapClick: () => void;
-  /** 剛送出回報時，第一次定位不要把地圖從新回報拉走 */
-  skipFirstFix: boolean;
+  homeRequest: number;
 }) {
   const map = useMap();
-  const fixId = geo.status === 'found' ? geo.fixId : 0;
-
   useEffect(() => {
-    if (geo.status !== 'found') return;
-    if (skipFirstFix && geo.fixId === 1) return;
-    map.flyTo([geo.lat, geo.lng], Math.max(map.getZoom(), USER_ZOOM), { duration: 1 });
-    // 只在新的定位結果時移動，避免使用者拖曳地圖後被拉回來
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fixId, map]);
-
+    if (homeRequest > 0) map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.8 });
+  }, [homeRequest, map]);
   useMapEvents({ click: onMapClick });
   return null;
 }
@@ -65,12 +44,12 @@ function PanToSelected({ report }: { report: ReportView | null }) {
 
 export default function MapPage() {
   const { reports, status: loadStatus, remove } = useReports();
-  const { state: geo, locate } = useGeolocation();
   // 剛從回報頁送出成功：選取新回報並顯示成功訊息
   const [createdId] = useState(peekCreatedFlash);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [homeRequest, setHomeRequest] = useState(0);
 
   useEffect(() => {
     clearCreatedFlash();
@@ -108,13 +87,6 @@ export default function MapPage() {
 
   const selected = reports.find((r) => r.id === selectedId) ?? null;
 
-  // 定位失敗時提示一次（剛送出回報時不蓋掉成功訊息）
-  useEffect(() => {
-    if (geo.status !== 'locating' && geo.status !== 'found' && !createdId) {
-      setToast(GEO_MESSAGES[geo.status]);
-    }
-  }, [geo.status, createdId]);
-
   const closeToast = useCallback(() => setToast(null), []);
   const closeSheet = useCallback(() => setSelectedId(null), []);
 
@@ -126,8 +98,8 @@ export default function MapPage() {
   return (
     <main className="relative h-full w-full overflow-hidden">
       <MapContainer
-        center={TAIWAN_CENTER}
-        zoom={TAIWAN_ZOOM}
+        center={DEFAULT_CENTER}
+        zoom={DEFAULT_ZOOM}
         minZoom={7}
         maxZoom={19}
         maxBounds={MAX_BOUNDS}
@@ -146,25 +118,8 @@ export default function MapPage() {
           }}
         />
         <ChinaMask />
-        <MapController geo={geo} onMapClick={closeSheet} skipFirstFix={Boolean(createdId)} />
+        <MapController onMapClick={closeSheet} homeRequest={homeRequest} />
         <PanToSelected report={selected} />
-
-        {geo.status === 'found' && (
-          <>
-            <Circle
-              center={[geo.lat, geo.lng]}
-              radius={Math.min(geo.accuracy, 500)}
-              pathOptions={{ color: '#1A73E8', weight: 1, fillOpacity: 0.12 }}
-              interactive={false}
-            />
-            <CircleMarker
-              center={[geo.lat, geo.lng]}
-              radius={8}
-              pathOptions={{ color: '#FFFFFF', weight: 3, fillColor: '#1A73E8', fillOpacity: 1 }}
-              interactive={false}
-            />
-          </>
-        )}
 
         {reports.map((r) => (
           <Marker
@@ -186,15 +141,15 @@ export default function MapPage() {
           <span className="truncate text-sm text-gray-500">即時人行道路況</span>
         </div>
 
-        {/* 載入中：正在定位 */}
-        {geo.status === 'locating' && (
+        {/* 載入中：讀取這台裝置上的回報 */}
+        {loadStatus === 'loading' && (
           <div role="status" className="flex justify-center">
             <p className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm shadow-md">
               <span
                 aria-hidden="true"
                 className="h-4 w-4 animate-spin rounded-full border-2 border-brand border-t-transparent"
               />
-              正在取得位置…
+              載入回報中…
             </p>
           </div>
         )}
@@ -217,7 +172,7 @@ export default function MapPage() {
         )}
 
         {/* 沒有資料 */}
-        {reports.length === 0 && (
+        {loadStatus === 'ready' && reports.length === 0 && (
           <div className="flex justify-center">
             <p className="rounded-full bg-white px-4 py-2 text-sm shadow-md">
               目前沒有回報，成為第一個回報的人吧！
@@ -228,7 +183,7 @@ export default function MapPage() {
         <Toast message={toast} onClose={closeToast} />
       </header>
 
-      {/* 底部操作列：圖例、回報按鈕、回到我的位置 */}
+      {/* 底部操作列：圖例、回報按鈕、回到預設地點 */}
       {!selected && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex items-end justify-between gap-2 px-4 pb-[max(28px,calc(env(safe-area-inset-bottom)+16px))]">
           <Legend />
@@ -244,20 +199,20 @@ export default function MapPage() {
           </button>
           <button
             type="button"
-            onClick={locate}
-            aria-label="回到我的位置"
-            disabled={geo.status === 'locating'}
+            onClick={() => setHomeRequest((n) => n + 1)}
+            aria-label={`回到${DEFAULT_PLACE_NAME}`}
+            title={`回到${DEFAULT_PLACE_NAME}`}
             className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md active:bg-gray-100 disabled:opacity-60"
           >
             <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-              <circle cx="12" cy="12" r="4" fill="#1A73E8" />
               <path
-                d="M12 2v3M12 19v3M2 12h3M19 12h3"
+                d="M4 11l8-7 8 7M6 9.5V20h4.5v-5h3v5H18V9.5"
+                fill="none"
                 stroke="#1A73E8"
                 strokeWidth="2"
                 strokeLinecap="round"
+                strokeLinejoin="round"
               />
-              <circle cx="12" cy="12" r="7" fill="none" stroke="#1A73E8" strokeWidth="2" />
             </svg>
           </button>
         </div>
@@ -268,7 +223,7 @@ export default function MapPage() {
           key={selected.id}
           report={selected}
           onClose={closeSheet}
-          onDelete={selected.isSample ? undefined : () => void handleDelete(selected.id)}
+          onDelete={() => void handleDelete(selected.id)}
           deleting={deleting}
         />
       )}

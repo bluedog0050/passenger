@@ -8,9 +8,10 @@ export const TAIWAN_BOUNDS = {
   east: 122.4,
 } as const;
 
-/** 無法定位時的預設畫面：台灣全島 */
-export const TAIWAN_CENTER: [number, number] = [23.7, 120.9];
-export const TAIWAN_ZOOM = 7;
+/** 預設地點：台中市南區 國立中興大學（不使用 GPS 定位，每次開啟都從這裡開始） */
+export const DEFAULT_PLACE_NAME = '國立中興大學';
+export const DEFAULT_CENTER: [number, number] = [24.1226, 120.675];
+export const DEFAULT_ZOOM = 16;
 
 /** 中國大陸陸地（台灣周邊範圍），每個多邊形為 [lat, lng] 點的陣列 */
 export const CHINA_MASK = chinaMask as [number, number][][];
