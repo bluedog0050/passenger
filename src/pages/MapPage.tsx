@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Circle,
   CircleMarker,
@@ -14,26 +14,33 @@ import Legend from '../components/Legend';
 import ReportSheet from '../components/ReportSheet';
 import Toast from '../components/Toast';
 import { getMarkerIcon } from '../components/markerIcon';
-import { getSampleReports } from '../data/samples';
-import { TAIWAN_BOUNDS, TAIWAN_CENTER, TAIWAN_ZOOM } from '../lib/geo';
+import { TAIWAN_CENTER, TAIWAN_ZOOM } from '../lib/geo';
+import { MAX_BOUNDS, TILE_ATTRIBUTION, TILE_URL } from '../lib/mapConfig';
 import { GEO_MESSAGES, useGeolocation, type GeoState } from '../lib/geolocation';
+import { clearCreatedFlash, peekCreatedFlash } from '../lib/flash';
 import { navigate } from '../lib/router';
+import { useReports } from '../lib/useReports';
 import type { ReportView } from '../types';
-
-const maxBounds: [[number, number], [number, number]] = [
-  [TAIWAN_BOUNDS.south, TAIWAN_BOUNDS.west],
-  [TAIWAN_BOUNDS.north, TAIWAN_BOUNDS.east],
-];
 
 const USER_ZOOM = 16;
 
 /** 定位成功時把地圖移過去；點地圖空白處關閉卡片 */
-function MapController({ geo, onMapClick }: { geo: GeoState; onMapClick: () => void }) {
+function MapController({
+  geo,
+  onMapClick,
+  skipFirstFix,
+}: {
+  geo: GeoState;
+  onMapClick: () => void;
+  /** 剛送出回報時，第一次定位不要把地圖從新回報拉走 */
+  skipFirstFix: boolean;
+}) {
   const map = useMap();
   const fixId = geo.status === 'found' ? geo.fixId : 0;
 
   useEffect(() => {
     if (geo.status !== 'found') return;
+    if (skipFirstFix && geo.fixId === 1) return;
     map.flyTo([geo.lat, geo.lng], Math.max(map.getZoom(), USER_ZOOM), { duration: 1 });
     // 只在新的定位結果時移動，避免使用者拖曳地圖後被拉回來
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,20 +64,56 @@ function PanToSelected({ report }: { report: ReportView | null }) {
 }
 
 export default function MapPage() {
-  // 階段 3-1 只有範例資料；階段 3-2 會再加上使用者自己的回報
-  const reports = useMemo(() => getSampleReports(), []);
+  const { reports, status: loadStatus, remove } = useReports();
   const { state: geo, locate } = useGeolocation();
+  // 剛從回報頁送出成功：選取新回報並顯示成功訊息
+  const [createdId] = useState(peekCreatedFlash);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    clearCreatedFlash();
+  }, []);
+
+  useEffect(() => {
+    if (!createdId || loadStatus !== 'ready') return;
+    if (reports.some((r) => r.id === createdId)) {
+      setSelectedId(createdId);
+      setToast('回報成功！已顯示在地圖上');
+    }
+    // 只在載入完成時執行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createdId, loadStatus]);
+
+  useEffect(() => {
+    if (loadStatus === 'error') setToast('無法讀取你先前的回報，請重新整理頁面');
+  }, [loadStatus]);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('確定要刪除這筆回報嗎？刪除後無法復原。')) return;
+    setDeleting(true);
+    try {
+      await remove(id);
+      setSelectedId(null);
+      setToast('已刪除回報');
+    } catch {
+      setToast('刪除失敗，請稍後再試');
+    } finally {
+      setDeleting(false);
+    }
+  };
   const [tileError, setTileError] = useState(false);
   const tileRef = useRef<L.TileLayer>(null);
 
   const selected = reports.find((r) => r.id === selectedId) ?? null;
 
-  // 定位失敗時提示一次
+  // 定位失敗時提示一次（剛送出回報時不蓋掉成功訊息）
   useEffect(() => {
-    if (geo.status !== 'locating' && geo.status !== 'found') setToast(GEO_MESSAGES[geo.status]);
-  }, [geo.status]);
+    if (geo.status !== 'locating' && geo.status !== 'found' && !createdId) {
+      setToast(GEO_MESSAGES[geo.status]);
+    }
+  }, [geo.status, createdId]);
 
   const closeToast = useCallback(() => setToast(null), []);
   const closeSheet = useCallback(() => setSelectedId(null), []);
@@ -87,15 +130,15 @@ export default function MapPage() {
         zoom={TAIWAN_ZOOM}
         minZoom={7}
         maxZoom={19}
-        maxBounds={maxBounds}
+        maxBounds={MAX_BOUNDS}
         maxBoundsViscosity={1}
         zoomControl={false}
         className="h-full w-full"
       >
         <TileLayer
           ref={tileRef}
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url={TILE_URL}
+          attribution={TILE_ATTRIBUTION}
           maxZoom={19}
           eventHandlers={{
             tileerror: () => setTileError(true),
@@ -103,7 +146,7 @@ export default function MapPage() {
           }}
         />
         <ChinaMask />
-        <MapController geo={geo} onMapClick={closeSheet} />
+        <MapController geo={geo} onMapClick={closeSheet} skipFirstFix={Boolean(createdId)} />
         <PanToSelected report={selected} />
 
         {geo.status === 'found' && (
@@ -220,7 +263,15 @@ export default function MapPage() {
         </div>
       )}
 
-      {selected && <ReportSheet report={selected} onClose={closeSheet} />}
+      {selected && (
+        <ReportSheet
+          key={selected.id}
+          report={selected}
+          onClose={closeSheet}
+          onDelete={selected.isSample ? undefined : () => void handleDelete(selected.id)}
+          deleting={deleting}
+        />
+      )}
     </main>
   );
 }

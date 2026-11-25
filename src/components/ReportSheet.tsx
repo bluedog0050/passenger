@@ -6,6 +6,9 @@ import type { ReportView } from '../types';
 interface Props {
   report: ReportView;
   onClose: () => void;
+  /** 只有使用者自己的回報才有刪除功能 */
+  onDelete?: () => void;
+  deleting?: boolean;
 }
 
 /** 往下拉超過這個距離（px）就關閉 */
@@ -69,7 +72,7 @@ function useSwipeToClose(onClose: () => void) {
 }
 
 /** 點選回報點後，從下方滑出的詳細卡片；可往下滑關閉 */
-export default function ReportSheet({ report, onClose }: Props) {
+export default function ReportSheet({ report, onClose, onDelete, deleting = false }: Props) {
   const category = getCategory(report.category);
   const swipe = useSwipeToClose(onClose);
 
@@ -146,6 +149,17 @@ export default function ReportSheet({ report, onClose }: Props) {
           </p>
         ) : (
           <p className="text-sm text-gray-500">沒有詳細說明</p>
+        )}
+
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={deleting}
+            className="h-12 w-full rounded-full border border-red-300 text-base font-medium text-red-700 active:bg-red-50 disabled:opacity-50"
+          >
+            {deleting ? '刪除中…' : '刪除這筆回報'}
+          </button>
         )}
       </div>
     </section>
