@@ -42,7 +42,7 @@
 - 目錄結構：
   - `src/pages/`：頁面（MapPage、ReportPage）
   - `src/components/`：共用元件
-  - `src/lib/`：邏輯（storage、geo、image、validation）
+  - `src/lib/`：邏輯（storage、geo、image、validation、routing、routeGeometry）
   - `src/data/`：類別定義、中國大陸遮罩資料
   - `src/types.ts`：共用型別
 - 禁止使用 `any`；外部資料要先驗證再使用
@@ -57,7 +57,7 @@
 - 上傳的照片**一律**經過 canvas 重新輸出成 JPEG，並用 `stripJpegMetadata()` 刪除附加資訊區段，確認不含 EXIF/GPS；長邊 ≤ 1280px；最多 3 張；原始檔 ≤ 10MB；只接受 JPG/PNG/HEIC
 - 禁止 `dangerouslySetInnerHTML`、`eval`、`innerHTML` 寫入使用者內容
 - 不收集姓名、電話、email 或其他個人資料
-- 不從外部 CDN 載入程式；只允許向 OSM 圖磚網域請求圖片
+- 不從外部 CDN 載入程式；只允許向 OSM 圖磚網域請求圖片，以及向 OSRM 路線服務（`routing.openstreetmap.de`）傳送導航的起點與目的地座標；外部主機只在 `src/lib/csp.ts` 定義
 - 保留 OSM 來源標示「© OpenStreetMap contributors」
 - 不在程式碼中放任何金鑰；`.env*` 列入 `.gitignore`（`.env.example` 除外）
 - 不新增會把使用者資料送到第三方的服務（分析、追蹤、廣告），除非使用者明確同意

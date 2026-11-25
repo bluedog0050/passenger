@@ -3,23 +3,11 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { buildCsp } from './src/lib/csp';
 
-// 內容安全政策（CSP）：只允許載入自己網站的程式，以及 OpenStreetMap 的地圖圖片。
+// 內容安全政策（CSP）：外部主機定義在 src/lib/csp.ts。
 // 只在正式打包時加入，因為開發伺服器需要即時更新的 inline 程式。
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  // Leaflet 會用 inline style 定位地圖圖塊
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://tile.openstreetmap.org",
-  "connect-src 'self'",
-  "font-src 'self'",
-  "manifest-src 'self'",
-  "worker-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-].join('; ');
+const CSP = buildCsp();
 
 function cspPlugin(): Plugin {
   return {

@@ -1,6 +1,7 @@
+import { TILE_HOST } from './csp';
 import { TAIWAN_BOUNDS } from './geo';
 
-export const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+export const TILE_URL = `${TILE_HOST}/{z}/{x}/{y}.png`;
 export const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 

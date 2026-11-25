@@ -1,31 +1,50 @@
 import L from 'leaflet';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import ChinaMask from '../components/ChinaMask';
 import Legend from '../components/Legend';
+import NavigationPanel from '../components/NavigationPanel';
 import ReportSheet from '../components/ReportSheet';
 import Toast from '../components/Toast';
-import { getMarkerIcon } from '../components/markerIcon';
+import { getEndpointIcon, getMarkerIcon } from '../components/markerIcon';
 import { DEFAULT_CENTER, DEFAULT_PLACE_NAME, DEFAULT_ZOOM } from '../lib/geo';
 import { MAX_BOUNDS, TILE_ATTRIBUTION, TILE_URL } from '../lib/mapConfig';
 import { clearCreatedFlash, peekCreatedFlash } from '../lib/flash';
+import { findAlongRoute, type LatLngTuple } from '../lib/routeGeometry';
+import type { RouteResult } from '../lib/routing';
 import { navigate } from '../lib/router';
+import { useNavigation } from '../lib/useNavigation';
 import { useReports } from '../lib/useReports';
 import type { ReportView } from '../types';
 
-/** 點地圖空白處關閉卡片；收到「回到預設地點」請求時移動地圖 */
+/** 點地圖時通知外層；收到「回到預設地點」請求時移動地圖 */
 function MapController({
   onMapClick,
   homeRequest,
 }: {
-  onMapClick: () => void;
+  onMapClick: (point: LatLngTuple) => void;
   homeRequest: number;
 }) {
   const map = useMap();
   useEffect(() => {
     if (homeRequest > 0) map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.8 });
   }, [homeRequest, map]);
-  useMapEvents({ click: onMapClick });
+  useMapEvents({ click: (e) => onMapClick([e.latlng.lat, e.latlng.lng]) });
+  return null;
+}
+
+/** 規劃出路線後，讓整條路線顯示在導航面板上方 */
+function FitRoute({ result }: { result: RouteResult | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!result) return;
+    const size = map.getSize();
+    map.fitBounds(L.latLngBounds(result.line), {
+      paddingTopLeft: [32, 100],
+      paddingBottomRight: [32, size.y * 0.5 + 24],
+      maxZoom: 17,
+    });
+  }, [result, map]);
   return null;
 }
 
@@ -50,6 +69,16 @@ export default function MapPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [homeRequest, setHomeRequest] = useState(0);
+  const nav = useNavigation();
+  const navActive = nav.state.phase !== 'off';
+  const picking = nav.state.phase === 'pickStart' || nav.state.phase === 'pickEnd';
+  const routeResult = nav.state.phase === 'done' ? nav.state.result : null;
+
+  // 路線兩側 30 公尺內的回報
+  const problems = useMemo(
+    () => (routeResult ? findAlongRoute(reports, routeResult.line, 30) : []),
+    [reports, routeResult],
+  );
 
   useEffect(() => {
     clearCreatedFlash();
@@ -90,6 +119,20 @@ export default function MapPage() {
   const closeToast = useCallback(() => setToast(null), []);
   const closeSheet = useCallback(() => setSelectedId(null), []);
 
+  // 點地圖：有卡片就先關卡片；導航選點中就設定起點或目的地
+  const onMapClick = (point: LatLngTuple) => {
+    if (selectedId) {
+      setSelectedId(null);
+      return;
+    }
+    if (picking) nav.pickPoint(point);
+  };
+
+  const openNavigation = () => {
+    setSelectedId(null);
+    nav.open();
+  };
+
   const retryTiles = () => {
     setTileError(false);
     tileRef.current?.redraw();
@@ -118,7 +161,27 @@ export default function MapPage() {
           }}
         />
         <ChinaMask />
-        <MapController onMapClick={closeSheet} homeRequest={homeRequest} />
+        <MapController onMapClick={onMapClick} homeRequest={homeRequest} />
+        <FitRoute result={routeResult} />
+
+        {routeResult && (
+          <Polyline
+            positions={routeResult.line}
+            interactive={false}
+            pathOptions={{
+              color: '#1A73E8',
+              weight: 6,
+              opacity: 0.85,
+              dashArray: routeResult.source === 'straight' ? '10 10' : undefined,
+            }}
+          />
+        )}
+        {navActive && nav.state.start && (
+          <Marker position={nav.state.start} icon={getEndpointIcon('start')} interactive={false} />
+        )}
+        {navActive && nav.state.end && (
+          <Marker position={nav.state.end} icon={getEndpointIcon('end')} interactive={false} />
+        )}
         <PanToSelected report={selected} />
 
         {reports.map((r) => (
@@ -183,8 +246,8 @@ export default function MapPage() {
         <Toast message={toast} onClose={closeToast} />
       </header>
 
-      {/* 底部操作列：圖例、回報按鈕、回到預設地點 */}
-      {!selected && (
+      {/* 底部操作列：圖例、回報按鈕、導航、回到預設地點（導航中隱藏） */}
+      {!selected && !navActive && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex items-end justify-between gap-2 px-4 pb-[max(28px,calc(env(safe-area-inset-bottom)+16px))]">
           <Legend />
           <button
@@ -197,25 +260,48 @@ export default function MapPage() {
             </span>
             回報路況
           </button>
-          <button
-            type="button"
-            onClick={() => setHomeRequest((n) => n + 1)}
-            aria-label={`回到${DEFAULT_PLACE_NAME}`}
-            title={`回到${DEFAULT_PLACE_NAME}`}
-            className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md active:bg-gray-100 disabled:opacity-60"
-          >
-            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-              <path
-                d="M4 11l8-7 8 7M6 9.5V20h4.5v-5h3v5H18V9.5"
-                fill="none"
-                stroke="#1A73E8"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          <div className="flex flex-col items-end gap-3">
+            <button
+              type="button"
+              onClick={openNavigation}
+              className="pointer-events-auto flex h-12 items-center gap-1.5 rounded-full bg-white px-4 text-base font-bold text-blue-700 shadow-md active:bg-gray-100"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path d="M12 2l7 19-7-4-7 4z" fill="#1A73E8" />
+              </svg>
+              導航
+            </button>
+            <button
+              type="button"
+              onClick={() => setHomeRequest((n) => n + 1)}
+              aria-label={`回到${DEFAULT_PLACE_NAME}`}
+              title={`回到${DEFAULT_PLACE_NAME}`}
+              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md active:bg-gray-100 disabled:opacity-60"
+            >
+              <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+                <path
+                  d="M4 11l8-7 8 7M6 9.5V20h4.5v-5h3v5H18V9.5"
+                  fill="none"
+                  stroke="#1A73E8"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
+      )}
+
+      {navActive && (
+        <NavigationPanel
+          state={nav.state}
+          problems={problems}
+          onSetDefaultStart={nav.setDefaultStart}
+          onRestart={nav.restart}
+          onExit={nav.exit}
+          onSelectProblem={setSelectedId}
+        />
       )}
 
       {selected && (

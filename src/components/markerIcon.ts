@@ -37,3 +37,22 @@ export function getMarkerIcon(category: CategoryId, selected = false): L.DivIcon
   }
   return icon;
 }
+
+const endpointCache = new Map<string, L.DivIcon>();
+
+/** 導航起點（綠「起」）與目的地（紅「終」）圖示；內容為固定文字 */
+export function getEndpointIcon(kind: 'start' | 'end'): L.DivIcon {
+  let icon = endpointCache.get(kind);
+  if (!icon) {
+    const color = kind === 'start' ? '#2E7D32' : '#C62828';
+    const text = kind === 'start' ? '起' : '終';
+    icon = L.divIcon({
+      className: 'report-pin',
+      html: `<svg viewBox="0 0 32 32" width="32" height="32" style="display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))"><circle cx="16" cy="16" r="13" fill="${color}" stroke="#fff" stroke-width="3"/><text x="16" y="16.5" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="700" fill="#fff">${text}</text></svg>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+    endpointCache.set(kind, icon);
+  }
+  return icon;
+}
