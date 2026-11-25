@@ -9,6 +9,7 @@ import {
   useMap,
   useMapEvents,
 } from 'react-leaflet';
+import ChinaMask from '../components/ChinaMask';
 import Legend from '../components/Legend';
 import ReportSheet from '../components/ReportSheet';
 import Toast from '../components/Toast';
@@ -101,6 +102,7 @@ export default function MapPage() {
             tileload: () => setTileError(false),
           }}
         />
+        <ChinaMask />
         <MapController geo={geo} onMapClick={closeSheet} />
         <PanToSelected report={selected} />
 

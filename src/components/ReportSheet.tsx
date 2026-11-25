@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState, type TouchEvent } from 'react';
 import { getCategory } from '../data/categories';
 import { formatTaipeiTime } from '../lib/format';
 import type { ReportView } from '../types';
@@ -8,9 +8,70 @@ interface Props {
   onClose: () => void;
 }
 
-/** 點選回報點後，從下方滑出的詳細卡片 */
+/** 往下拉超過這個距離（px）就關閉 */
+const CLOSE_DISTANCE = 100;
+/** 或是快速往下滑（px/ms）且超過 40px 也關閉 */
+const CLOSE_VELOCITY = 0.5;
+
+/** 往下滑就關閉卡片的手勢 */
+function useSwipeToClose(onClose: () => void) {
+  const ref = useRef<HTMLElement>(null);
+  const start = useRef<{ x: number; y: number; t: number; axis: 'x' | 'y' | null } | null>(null);
+  const [dragY, setDragY] = useState(0);
+  const [closing, setClosing] = useState(false);
+
+  const onTouchStart = (e: TouchEvent) => {
+    const t = e.touches[0];
+    // 卡片內容已往下捲動時，讓使用者先捲回頂端，不啟動關閉手勢
+    if (!t || (ref.current && ref.current.scrollTop > 0)) {
+      start.current = null;
+      return;
+    }
+    start.current = { x: t.clientX, y: t.clientY, t: Date.now(), axis: null };
+  };
+
+  const onTouchMove = (e: TouchEvent) => {
+    const s = start.current;
+    const t = e.touches[0];
+    if (!s || !t) return;
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    // 先判斷是左右滑（看照片）還是上下滑
+    if (!s.axis && Math.max(Math.abs(dx), Math.abs(dy)) > 8) {
+      s.axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+    }
+    if (s.axis === 'y') setDragY(Math.max(0, dy));
+  };
+
+  const onTouchEnd = () => {
+    const s = start.current;
+    start.current = null;
+    if (!s || s.axis !== 'y') return;
+    const velocity = dragY / Math.max(1, Date.now() - s.t);
+    if (dragY > CLOSE_DISTANCE || (dragY > 40 && velocity > CLOSE_VELOCITY)) {
+      setClosing(true);
+      window.setTimeout(onClose, 200);
+    } else {
+      setDragY(0);
+    }
+  };
+
+  const style = {
+    transform: closing ? 'translateY(100%)' : dragY > 0 ? `translateY(${dragY}px)` : undefined,
+    transition: start.current?.axis === 'y' ? 'none' : 'transform 0.2s ease-out',
+  };
+
+  return {
+    ref,
+    style,
+    handlers: { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel: onTouchEnd },
+  };
+}
+
+/** 點選回報點後，從下方滑出的詳細卡片；可往下滑關閉 */
 export default function ReportSheet({ report, onClose }: Props) {
   const category = getCategory(report.category);
+  const swipe = useSwipeToClose(onClose);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -22,10 +83,13 @@ export default function ReportSheet({ report, onClose }: Props) {
 
   return (
     <section
+      ref={swipe.ref}
+      style={swipe.style}
+      {...swipe.handlers}
       role="dialog"
       aria-modal="false"
       aria-labelledby="sheet-title"
-      className="absolute inset-x-0 bottom-0 z-[1050] max-h-[65%] animate-slide-up overflow-y-auto rounded-t-3xl bg-white pb-[max(16px,env(safe-area-inset-bottom))] shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
+      className="absolute inset-x-0 bottom-0 z-[1050] max-h-[65%] animate-slide-up overflow-y-auto overscroll-contain rounded-t-3xl bg-white pb-[max(16px,env(safe-area-inset-bottom))] shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
     >
       <div className="sticky top-0 z-10 flex items-center justify-between bg-white px-4 pt-2">
         <span
