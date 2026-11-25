@@ -15,7 +15,7 @@ export interface NavState {
 
 const INITIAL: NavState = { phase: 'off', start: null, end: null, result: null, error: null };
 
-/** 導航流程：選起點 → 選目的地 → 規劃路線 → 顯示結果 */
+/** 導航流程：確定起點 → 確定終點 → 規劃路線 → 顯示結果（點位由畫面中央圖釘決定） */
 export function useNavigation() {
   const [state, setState] = useState<NavState>(INITIAL);
   const abortRef = useRef<AbortController | null>(null);
@@ -58,7 +58,8 @@ export function useNavigation() {
     setState(INITIAL);
   }, []);
 
-  const pickPoint = useCallback(
+  /** 確定目前圖釘位置為起點或終點 */
+  const confirmPoint = useCallback(
     (point: LatLngTuple) => {
       if (state.phase !== 'pickStart' && state.phase !== 'pickEnd') return;
       if (!isInTaiwan(point[0], point[1])) {
@@ -78,5 +79,5 @@ export function useNavigation() {
     setState({ ...INITIAL, phase: 'pickEnd', start: [DEFAULT_CENTER[0], DEFAULT_CENTER[1]] });
   }, []);
 
-  return { state, open, exit, pickPoint, setDefaultStart, restart: open };
+  return { state, open, exit, confirmPoint, setDefaultStart, restart: open };
 }

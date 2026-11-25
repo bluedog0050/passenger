@@ -8,11 +8,15 @@ interface Props {
   state: NavState;
   problems: AlongRouteItem<ReportView>[];
   onSetDefaultStart: () => void;
+  /** 以畫面中央圖釘的位置確定起點或終點 */
+  onConfirm: () => void;
   onRestart: () => void;
   onExit: () => void;
   onSelectProblem: (id: string) => void;
 }
 
+const primaryBtn =
+  'h-12 w-full rounded-full bg-brand text-base font-bold text-white active:bg-brand-dark';
 const secondaryBtn =
   'h-11 flex-1 rounded-full border border-gray-300 px-3 text-sm font-medium active:bg-gray-100';
 
@@ -35,6 +39,7 @@ export default function NavigationPanel({
   state,
   problems,
   onSetDefaultStart,
+  onConfirm,
   onRestart,
   onExit,
   onSelectProblem,
@@ -65,12 +70,11 @@ export default function NavigationPanel({
 
       {phase === 'pickStart' && (
         <div className="space-y-3">
-          <Step n="起" text="點地圖選擇起點" />
-          <button
-            type="button"
-            onClick={onSetDefaultStart}
-            className="h-12 w-full rounded-full bg-brand text-base font-bold text-white active:bg-brand-dark"
-          >
+          <Step n="起" text="拖曳地圖，把綠色圖釘對準起點" />
+          <button type="button" onClick={onConfirm} className={primaryBtn}>
+            確定起點
+          </button>
+          <button type="button" onClick={onSetDefaultStart} className={`${secondaryBtn} w-full`}>
             以{DEFAULT_PLACE_NAME}為起點
           </button>
         </div>
@@ -79,7 +83,10 @@ export default function NavigationPanel({
       {phase === 'pickEnd' && (
         <div className="space-y-3">
           <Step n="起" text="已選擇起點" done />
-          <Step n="終" text="點地圖選擇目的地" />
+          <Step n="終" text="拖曳地圖，把紅色圖釘對準終點" />
+          <button type="button" onClick={onConfirm} className={primaryBtn}>
+            確定終點
+          </button>
           <button type="button" onClick={onRestart} className={`${secondaryBtn} w-full`}>
             重新選擇起點
           </button>

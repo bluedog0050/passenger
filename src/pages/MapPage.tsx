@@ -10,7 +10,7 @@ import { getEndpointIcon, getMarkerIcon } from '../components/markerIcon';
 import { DEFAULT_CENTER, DEFAULT_PLACE_NAME, DEFAULT_ZOOM } from '../lib/geo';
 import { MAX_BOUNDS, TILE_ATTRIBUTION, TILE_URL } from '../lib/mapConfig';
 import { clearCreatedFlash, peekCreatedFlash } from '../lib/flash';
-import { findAlongRoute, type LatLngTuple } from '../lib/routeGeometry';
+import { findAlongRoute } from '../lib/routeGeometry';
 import type { RouteResult } from '../lib/routing';
 import { navigate } from '../lib/router';
 import { useNavigation } from '../lib/useNavigation';
@@ -22,14 +22,14 @@ function MapController({
   onMapClick,
   homeRequest,
 }: {
-  onMapClick: (point: LatLngTuple) => void;
+  onMapClick: () => void;
   homeRequest: number;
 }) {
   const map = useMap();
   useEffect(() => {
     if (homeRequest > 0) map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.8 });
   }, [homeRequest, map]);
-  useMapEvents({ click: (e) => onMapClick([e.latlng.lat, e.latlng.lng]) });
+  useMapEvents({ click: onMapClick });
   return null;
 }
 
@@ -119,13 +119,14 @@ export default function MapPage() {
   const closeToast = useCallback(() => setToast(null), []);
   const closeSheet = useCallback(() => setSelectedId(null), []);
 
-  // 點地圖：有卡片就先關卡片；導航選點中就設定起點或目的地
-  const onMapClick = (point: LatLngTuple) => {
-    if (selectedId) {
-      setSelectedId(null);
-      return;
-    }
-    if (picking) nav.pickPoint(point);
+  // 點地圖空白處關閉卡片
+  const onMapClick = () => setSelectedId(null);
+
+  // 導航：以畫面中央圖釘（地圖中心）的位置確定起點或終點
+  const mapRef = useRef<L.Map>(null);
+  const confirmCenter = () => {
+    const c = mapRef.current?.getCenter();
+    if (c) nav.confirmPoint([c.lat, c.lng]);
   };
 
   const openNavigation = () => {
@@ -141,6 +142,7 @@ export default function MapPage() {
   return (
     <main className="relative h-full w-full overflow-hidden">
       <MapContainer
+        ref={mapRef}
         center={DEFAULT_CENTER}
         zoom={DEFAULT_ZOOM}
         minZoom={7}
@@ -246,37 +248,17 @@ export default function MapPage() {
         <Toast message={toast} onClose={closeToast} />
       </header>
 
-      {/* 底部操作列：圖例、回報按鈕、導航、回到預設地點（導航中隱藏） */}
+      {/* 底部操作區（導航中隱藏）：上排圖例、回到預設地點；下排回報路況、導航 */}
       {!selected && !navActive && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] flex items-end justify-between gap-2 px-4 pb-[max(28px,calc(env(safe-area-inset-bottom)+16px))]">
-          <Legend />
-          <button
-            type="button"
-            onClick={() => navigate('report')}
-            className="pointer-events-auto absolute bottom-[max(24px,calc(env(safe-area-inset-bottom)+12px))] left-1/2 flex h-14 -translate-x-1/2 items-center justify-center gap-1 rounded-full bg-brand px-6 text-lg font-bold text-white shadow-lg active:bg-brand-dark"
-          >
-            <span aria-hidden="true" className="text-2xl leading-none">
-              ＋
-            </span>
-            回報路況
-          </button>
-          <div className="flex flex-col items-end gap-3">
-            <button
-              type="button"
-              onClick={openNavigation}
-              className="pointer-events-auto flex h-12 items-center gap-1.5 rounded-full bg-white px-4 text-base font-bold text-blue-700 shadow-md active:bg-gray-100"
-            >
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                <path d="M12 2l7 19-7-4-7 4z" fill="#1A73E8" />
-              </svg>
-              導航
-            </button>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1000] space-y-3 px-4 pb-[max(24px,calc(env(safe-area-inset-bottom)+12px))]">
+          <div className="flex items-end justify-between">
+            <Legend />
             <button
               type="button"
               onClick={() => setHomeRequest((n) => n + 1)}
               aria-label={`回到${DEFAULT_PLACE_NAME}`}
               title={`回到${DEFAULT_PLACE_NAME}`}
-              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md active:bg-gray-100 disabled:opacity-60"
+              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md active:bg-gray-100"
             >
               <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
                 <path
@@ -290,7 +272,58 @@ export default function MapPage() {
               </svg>
             </button>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('report')}
+              className="pointer-events-auto flex h-14 items-center justify-center gap-1 rounded-full bg-brand text-lg font-bold text-white shadow-lg active:bg-brand-dark"
+            >
+              <span aria-hidden="true" className="text-2xl leading-none">
+                ＋
+              </span>
+              回報路況
+            </button>
+            <button
+              type="button"
+              onClick={openNavigation}
+              className="pointer-events-auto flex h-14 items-center justify-center gap-1.5 rounded-full border-2 border-brand bg-white text-lg font-bold text-brand shadow-lg active:bg-orange-50"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path d="M12 2l7 19-7-4-7 4z" fill="currentColor" />
+              </svg>
+              導航
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* 導航選點：固定在畫面中央的圖釘，針尖對準地圖中心 */}
+      {picking && (
+        <svg
+          viewBox="0 0 38 38"
+          width="48"
+          height="48"
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-[900] -translate-x-1/2 -translate-y-full drop-shadow-md"
+        >
+          <path
+            d="M19 37C19 37 4 23.5 4 14.5a15 15 0 0 1 30 0C34 23.5 19 37 19 37z"
+            fill={nav.state.phase === 'pickStart' ? '#2E7D32' : '#C62828'}
+            stroke="#fff"
+            strokeWidth="2.5"
+          />
+          <text
+            x="19"
+            y="15"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize="13"
+            fontWeight="700"
+            fill="#fff"
+          >
+            {nav.state.phase === 'pickStart' ? '起' : '終'}
+          </text>
+        </svg>
       )}
 
       {navActive && (
@@ -298,6 +331,7 @@ export default function MapPage() {
           state={nav.state}
           problems={problems}
           onSetDefaultStart={nav.setDefaultStart}
+          onConfirm={confirmCenter}
           onRestart={nav.restart}
           onExit={nav.exit}
           onSelectProblem={setSelectedId}
